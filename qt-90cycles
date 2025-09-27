@@ -1,0 +1,100 @@
+//@version=5
+indicator("Quarterly Theory - 90m Dividers", "QT 90m Divs", overlay=true)
+
+// ————————————————————————————————————————————————————————————————————————————————————————————————————
+//                                               SETTINGS
+// ————————————————————————————————————————————————————————————————————————————————————————————————————
+g_dividers = "Dividers & Labels"
+i_showDividers     = input.bool(true, "Show 90m Quarter Dividers", group = g_dividers)
+i_dividerColor     = input.color(color.new(color.gray, 50), "Divider Color", group = g_dividers)
+i_dividerStyle     = input.string("Dashed", "Divider Style", options=["Solid", "Dotted", "Dashed"], group = g_dividers)
+i_dividerWidth     = input.int(1, "Divider Width", minval=1, group = g_dividers)
+
+g_labels = "Quarter Labels"
+i_showLabels       = input.bool(true, "Show Quarter Labels (Q1, Q2..)", group=g_labels)
+i_labelColor       = input.color(color.new(color.gray, 0), "Label Color", group = g_labels) // Renamed for clarity
+
+// Time Settings
+g_time = "Time"
+i_timezone = input.string("UTC-4", "Timezone", group = g_time)
+
+// ————————————————————————————————————————————————————————————————————————————————————————————————————
+//                                           TIME CALCULATION & LOGIC
+// ————————————————————————————————————————————————————————————————————————————————————————————————————
+// Get current bar's time information
+bar_hour   = hour(time, i_timezone)
+bar_minute = minute(time, i_timezone)
+
+// --- Divider Logic ---
+f_getQuarterLabel(h, m) =>
+    var string quarterLabel = na
+    // Asia Session (18:00 - 00:00)
+    if (h >= 18)
+        if (h < 19 or (h == 19 and m < 30))
+            quarterLabel := "Q1"
+        else if (h < 21)
+            quarterLabel := "Q2"
+        else if (h < 22 or (h == 22 and m < 30))
+            quarterLabel := "Q3"
+        else
+            quarterLabel := "Q4"
+    // London Session (00:00 - 06:00)
+    else if (h < 6)
+        if (h < 1 or (h == 1 and m < 30))
+            quarterLabel := "Q1"
+        else if (h < 3)
+            quarterLabel := "Q2"
+        else if (h < 4 or (h == 4 and m < 30))
+            quarterLabel := "Q3"
+        else
+            quarterLabel := "Q4"
+    // New York AM Session (06:00 - 12:00)
+    else if (h < 12)
+        if (h < 7 or (h == 7 and m < 30))
+            quarterLabel := "Q1"
+        else if (h < 9)
+            quarterLabel := "Q2"
+        else if (h < 10 or (h == 10 and m < 30))
+            quarterLabel := "Q3"
+        else
+            quarterLabel := "Q4"
+    // New York PM Session (12:00 - 18:00)
+    else if (h < 18)
+        if (h < 13 or (h == 13 and m < 30))
+            quarterLabel := "Q1"
+        else if (h < 15)
+            quarterLabel := "Q2"
+        else if (h < 16 or (h == 16 and m < 30))
+            quarterLabel := "Q3"
+        else
+            quarterLabel := "Q4"
+    quarterLabel
+
+currentQuarterLabel = f_getQuarterLabel(bar_hour, bar_minute)
+prevQuarterLabel    = f_getQuarterLabel(hour(time[1], i_timezone), minute(time[1], i_timezone))
+isNewQuarter        = currentQuarterLabel != prevQuarterLabel and not na(currentQuarterLabel)
+f_getLineStyle() => i_dividerStyle == "Solid" ? line.style_solid : i_dividerStyle == "Dotted" ? line.style_dotted : line.style_dashed
+
+// --- Label Plotting Logic ---
+is_q1_mid = (bar_hour == 0 and bar_minute == 45) or (bar_hour == 6 and bar_minute == 45) or (bar_hour == 12 and bar_minute == 45) or (bar_hour == 18 and bar_minute == 45)
+is_q2_mid = (bar_hour == 2 and bar_minute == 15) or (bar_hour == 8 and bar_minute == 15) or (bar_hour == 14 and bar_minute == 15) or (bar_hour == 20 and bar_minute == 15)
+is_q3_mid = (bar_hour == 3 and bar_minute == 45) or (bar_hour == 9 and bar_minute == 45) or (bar_hour == 15 and bar_minute == 45) or (bar_hour == 21 and bar_minute == 45)
+is_q4_mid = (bar_hour == 5 and bar_minute == 15) or (bar_hour == 11 and bar_minute == 15) or (bar_hour == 17 and bar_minute == 15) or (bar_hour == 23 and bar_minute == 15)
+
+plot_q1 = is_q1_mid and not is_q1_mid[1]
+plot_q2 = is_q2_mid and not is_q2_mid[1]
+plot_q3 = is_q3_mid and not is_q3_mid[1]
+plot_q4 = is_q4_mid and not is_q4_mid[1]
+
+// ————————————————————————————————————————————————————————————————————————————————————————————————————
+//                                           DRAWING OBJECTS
+// ————————————————————————————————————————————————————————————————————————————————————————————————————
+if (i_showDividers and isNewQuarter)
+    line.new(bar_index, low, bar_index, high, extend=extend.both,
+         color=i_dividerColor, style=f_getLineStyle(), width=i_dividerWidth)
+
+// CORRECTED: Using the 'text' argument for multi-character strings. The 'char' argument is now empty.
+plotchar(series=i_showLabels and plot_q1, title="Q1", char='', text="Q1", location=location.bottom, color=i_labelColor, size=size.small)
+plotchar(series=i_showLabels and plot_q2, title="Q2", char='', text="Q2", location=location.bottom, color=i_labelColor, size=size.small)
+plotchar(series=i_showLabels and plot_q3, title="Q3", char='', text="Q3", location=location.bottom, color=i_labelColor, size=size.small)
+plotchar(series=i_showLabels and plot_q4, title="Q4", char='', text="Q4", location=location.bottom, color=i_labelColor, size=size.small)
