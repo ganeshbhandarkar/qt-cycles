@@ -1,0 +1,118 @@
+// //@version=5
+// indicator("Quarterly Theory - 90m Cycles", "QT 90m", overlay=true)
+
+// // ————————————————————————————————————————————————————————————————————————————————————————————————————
+// //                                               SETTINGS
+// // ————————————————————————————————————————————————————————————————————————————————————————————————————
+// // Box Display Settings
+// g_boxes = "Box Display"
+// i_showBoxes     = input.bool(true, "Show 90m Quarter Boxes", group = g_boxes)
+// i_q1Color       = input.color(color.new(color.gray, 85), "Q1 Color", group = g_boxes)
+// i_q2Color       = input.color(color.new(color.red, 85), "Q2 Color", group = g_boxes)
+// i_q3Color       = input.color(color.new(color.green, 85), "Q3 Color", group = g_boxes)
+// i_q4Color       = input.color(color.new(color.blue, 85), "Q4 Color", group = g_boxes)
+
+// // True Open Line Settings
+// g_true_open = "True Open (Q2)"
+// i_showTrueOpen  = input.bool(true, "Show True Open Line", group = g_true_open)
+// i_trueOpenColor = input.color(color.new(color.white, 20), "Line Color", group = g_true_open)
+// i_trueOpenStyle = input.string("Dashed", "Line Style", options=["Solid", "Dotted", "Dashed"], group = g_true_open)
+// i_trueOpenWidth = input.int(1, "Line Width", minval=1, group = g_true_open)
+
+// // Time Settings
+// g_time = "Time"
+// i_timezone = input.string("UTC-4", "Timezone", group = g_time)
+
+// // ————————————————————————————————————————————————————————————————————————————————————————————————————
+// //                                           TIME CALCULATION & LOGIC
+// // ————————————————————————————————————————————————————————————————————————————————————————————————————
+// // Convert line style string to Pine Script format
+// f_getLineStyle() =>
+//     style = i_trueOpenStyle == "Solid" ? line.style_solid : i_trueOpenStyle == "Dotted" ? line.style_dotted : line.style_dashed
+//     style
+
+// // Function to get the current quarter's color based on time
+// f_getQuarterInfo(h, m) =>
+//     var color boxBgColor = na
+//     var bool isQ2 = false
+
+//     // Asia Session (18:00 - 00:00)
+//     if (h >= 18)
+//         if (h < 19 or (h == 19 and m < 30))
+//             boxBgColor := i_q1Color
+//         else if (h < 21)
+//             boxBgColor := i_q2Color
+//             isQ2 := true
+//         else if (h < 22 or (h == 22 and m < 30))
+//             boxBgColor := i_q3Color
+//         else
+//             boxBgColor := i_q4Color
+//     // London Session (00:00 - 06:00)
+//     else if (h < 6)
+//         if (h < 1 or (h == 1 and m < 30))
+//             boxBgColor := i_q1Color
+//         else if (h < 3)
+//             boxBgColor := i_q2Color
+//             isQ2 := true
+//         else if (h < 4 or (h == 4 and m < 30))
+//             boxBgColor := i_q3Color
+//         else
+//             boxBgColor := i_q4Color
+//     // New York AM Session (06:00 - 12:00)
+//     else if (h < 12)
+//         if (h < 7 or (h == 7 and m < 30))
+//             boxBgColor := i_q1Color
+//         else if (h < 9)
+//             boxBgColor := i_q2Color
+//             isQ2 := true
+//         else if (h < 10 or (h == 10 and m < 30))
+//             boxBgColor := i_q3Color
+//         else
+//             boxBgColor := i_q4Color
+//     // New York PM Session (12:00 - 18:00)
+//     else if (h < 18)
+//         if (h < 13 or (h == 13 and m < 30))
+//             boxBgColor := i_q1Color
+//         else if (h < 15)
+//             boxBgColor := i_q2Color
+//             isQ2 := true
+//         else if (h < 16 or (h == 16 and m < 30))
+//             boxBgColor := i_q3Color
+//         else
+//             boxBgColor := i_q4Color
+//     [boxBgColor, isQ2]
+
+// // Get current bar's time information
+// bar_hour   = hour(time, i_timezone)
+// bar_minute = minute(time, i_timezone)
+
+// // Determine current quarter color and if it's a Q2
+// [currentQuarterColor, isQ2] = f_getQuarterInfo(bar_hour, bar_minute)
+// [prevQuarterColor, isPrevQ2] = f_getQuarterInfo(hour(time[1], i_timezone), minute(time[1], i_timezone))
+
+// // Detect the start of a new quarter
+// bool isNewQuarter = currentQuarterColor != prevQuarterColor
+
+// // ————————————————————————————————————————————————————————————————————————————————————————————————————
+// //                                           DRAWING OBJECTS
+// // ————————————————————————————————————————————————————————————————————————————————————————————————————
+// // --- Box Drawing Logic ---
+// var box quarterBox = na
+
+// if (i_showBoxes)
+//     if (isNewQuarter)
+//         // A new quarter has started, so create a new box
+//         quarterBox := box.new(bar_index, high, bar_index + 1, low, border_color=na, bgcolor=currentQuarterColor)
+//     else
+//         // We are in the same quarter, so extend the existing box
+//         box.set_right(quarterBox, bar_index + 1)
+//         box.set_top(quarterBox, math.max(high, box.get_top(quarterBox)))
+//         box.set_bottom(quarterBox, math.min(low, box.get_bottom(quarterBox)))
+
+// // --- True Open Line Logic ---
+// // Detect the very first bar of a Q2
+// bool isNewQ2Start = isQ2 and not isPrevQ2
+
+// if (i_showTrueOpen and isNewQ2Start)
+//     // Draw a new line at the open of the first bar of Q2 and extend it to the right
+//     line.new(bar_index, open, bar_index + 1, open, extend=extend.right, color=i_trueOpenColor, style=f_getLineStyle(), width=i_trueOpenWidth)
